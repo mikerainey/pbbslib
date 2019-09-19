@@ -51,4 +51,4 @@ test_schedulers: test_scheduler_OMP test_scheduler_CILK test_scheduler_HG
 all:	time_tests
 
 clean:
-	rm -f time_tests test_alloc 
+	rm -f time_tests test_alloc test_scheduler_*

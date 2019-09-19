@@ -42,16 +42,17 @@ int main (int argc, char *argv[]) {
     primes = prime_sieve((long) n);
     t.next("calculate primes");
   }
-  
+
+  /* 
   if (outfile.size() > 0) {
+    // the line below seems to break compilation -- Mike
     auto out_str = to_char_seq(primes);
     t.next("generate output string");
 
     char_seq_to_file(out_str, outfile);
     t.next("write file");
   } else cout << "number of primes = " << primes.size() << endl;
-
-
+  */
 
 }
 
