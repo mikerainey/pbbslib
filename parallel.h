@@ -50,6 +50,7 @@ inline void set_num_workers(int n) {
   std::stringstream ss; ss << n;
   if (0 != __cilkrts_set_param("nworkers", ss.str().c_str())) {
     throw std::runtime_error("failed to set worker count!");
+  }
 }
 
 template <typename F>
@@ -74,6 +75,11 @@ inline void par_do(Lf left, Rf right, bool conservative) {
     cilk_spawn right();
     left();
     cilk_sync;
+}
+
+template <typename Job>
+inline void parallel_run(Job job, int num_threads=0) {
+  job();
 }
 
 // openmp
