@@ -179,7 +179,7 @@ block_allocator::block_allocator(size_t block_size,
 
 void block_allocator::clear() {
   if (num_used_blocks() > 0) 
-    cout << "Warning: not clearing memory pool, block_size=" << block_size()
+    std::cerr << "Warning: not clearing memory pool, block_size=" << block_size()
 	 << " : allocated blocks remain" << endl;
   else {
     // clear lists
