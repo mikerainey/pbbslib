@@ -35,7 +35,7 @@ stdenv.mkDerivation rec {
         CC=${gcc}/bin/g++
       make -C strings -j test_suffix_tree \
         CC=${gcc}/bin/g++
-    '';
+      '';
 
   installPhase =
     let buildBinaries =
@@ -59,6 +59,8 @@ stdenv.mkDerivation rec {
     ''
     mkdir -p $out
     cp *.h $out/
+    mkdir -p $out/strings
+    cp strings/*.h $out/strings
     ${buildBinaries}
     '';
 }   
