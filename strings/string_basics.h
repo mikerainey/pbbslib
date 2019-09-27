@@ -38,6 +38,9 @@
 
 namespace pbbs {
 
+  auto is_space = [] (char a) {
+    return a == '\n' || a == '\t' || a == ' ';};
+
   // Reads a character sequence from a file :
   //    if end is zero or larger than file, then returns full file
   //    if start past end of file then returns an empty string.
