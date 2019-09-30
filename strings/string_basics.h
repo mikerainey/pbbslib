@@ -95,7 +95,8 @@ namespace pbbs {
     else end = std::min(end,length);
     size_t n = end - start;
     file.seekg (start, std::ios::beg);
-    char* bytes = new_array<char>(n+1);
+    using allocator = typename sequence<char>::allocator_type;
+    char* bytes = allocator().allocate(n+1);
     file.read (bytes,n);
     file.close();
     bytes[n] = 0;

@@ -101,6 +101,7 @@ namespace pbbs {
   public:
     using value_type = T;
     //using iterator = T*;
+    using allocator_type = Allocator;
 
     sequence() { empty(); }
 
