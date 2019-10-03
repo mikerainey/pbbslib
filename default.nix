@@ -42,6 +42,8 @@ stdenv.mkDerivation rec {
     ''
     mkdir -p $out/
     cp *.h $out
+    mkdir -p $out/examples/
+    cp examples/*.h $out/examples/
     mkdir -p $out/strings
     cp strings/*.h $out/strings
 
