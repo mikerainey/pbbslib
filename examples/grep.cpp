@@ -1,5 +1,4 @@
 #include "get_time.h"
-#include "strings/string_basics.h"
 #include "parse_command_line.h"
 #include "grep.h"
 

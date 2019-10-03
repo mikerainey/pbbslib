@@ -2,6 +2,7 @@
 
 #include "sequence.h"
 #include "group_by.h"
+#include "strings/string_basics.h"
 
 namespace pbbs {
 
