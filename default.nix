@@ -14,7 +14,7 @@ stdenv.mkDerivation rec {
 
   buildInputs =
        [ makeWrapper gcc which ]
-     ++ (if jemalloc == null then [] else [ jemalloc]);
+     ++ (if jemalloc == null then [] else [ jemalloc ]);
 
   buildPhase =
     let jemallocCfg =
