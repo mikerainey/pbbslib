@@ -256,7 +256,6 @@ namespace pbbs {
   template <class Seq, class UnaryPred>
   auto split_range(Seq const &S, UnaryPred const &is_space)
     -> sequence<range<typename Seq::value_type *>> {
-    using T = typename Seq::value_type;
     size_t n = S.size();
 
     auto X = sequence<bool>(n, [&] (size_t i) {
