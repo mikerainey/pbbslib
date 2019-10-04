@@ -16,6 +16,8 @@ stdenv.mkDerivation rec {
        [ makeWrapper gcc which ]
      ++ (if jemalloc == null then [] else [ jemalloc ]);
 
+  enableParallelBuilding = true;
+  
   buildPhase =
     let jemallocCfg =
           if jemalloc == null then
@@ -25,14 +27,14 @@ stdenv.mkDerivation rec {
     in
     ''
     ${jemallocCfg}    
-    make -j \
+    make -j $NIX_BUILD_CORES  \
       test_schedulers \
       test_alloc \
       time_tests \
       CC=${gcc}/bin/g++
-    make -C examples -j all  \
+    make -C examples -j $NIX_BUILD_CORES  all  \
       CC=${gcc}/bin/g++
-    make -C strings -j test_suffix_tree \
+    make -C strings -j $NIX_BUILD_CORES  test_suffix_tree \
       CC=${gcc}/bin/g++
     '';
 
