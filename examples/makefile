@@ -46,7 +46,7 @@ runall : $(EXAMPLES)
 	./bw -r 5 bw.cpp
 
 # object files
-% : %.cpp ligra.h
+% : %.cpp ligra.h extra.h grep.h wc.h
 	$(CC) $(CFLAGS) $(PFLAGS) $@.cpp -o $@ $(JEMALLOC)
 
 clean:
