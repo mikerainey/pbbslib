@@ -12,6 +12,8 @@
 #include "parse_command_line.h"
 #include "build_index.h"
 
+using namespace pbbs;
+
 int main (int argc, char *argv[]) {
   commandLine P(argc, argv, "[-r <rounds>] [-o <outfile>] infile");
   int rounds = P.getOptionIntValue("-r", 1);
