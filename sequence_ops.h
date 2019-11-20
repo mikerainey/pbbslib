@@ -52,7 +52,7 @@ namespace pbbs {
     return sequence<T>(1, v); }
 
   template <SEQ Seq, RANGE Range>
-  auto copy(Seq const &A, Range R, flags) -> void {
+  auto copy(Seq const &A, Range R, flags = no_flag) -> void {
     parallel_for(0, A.size(), [&] (size_t i) {R[i] = A[i];});}
 
   constexpr const size_t _log_block_size = 10;
