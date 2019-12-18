@@ -124,8 +124,8 @@ namespace pbbs {
   }
 
   template <class E, class BinPred>
-  void quicksort(E* A, size_t n, const BinPred& f) {
-    if (n < (1 << 10)) quicksort_serial(A, n, f);
+  void quicksort(E* A, size_t n, const BinPred& f, long cutsize = (1 << 10)) {
+    if (n < cutsize) quicksort_serial(A, n, f);
     else {
       E* L; E* M; bool mid_eq;
       std::tie(L, M, mid_eq) = split3(A,n,f);
