@@ -137,6 +137,9 @@ struct Deque {
 
 //thread_local int thread_id;
 
+struct alignas(64) perthread_elapsed { double e; };
+std::array<perthread_elapsed, 128> time_in_get_job;
+
 template <typename Job>
 struct scheduler {
 
@@ -218,7 +221,7 @@ public:
   int worker_id() {
     return thread_id;
   }
-  void set_num_workers(int) {
+  void set_num_workers(int n) {
     std::cout << "Unsupported" << std::endl; exit(-1);
   }
 
@@ -253,17 +256,32 @@ private:
   // Find a job, first trying local stack, then random steals.
   template <typename F>
   Job* get_job(F finished) {
+    Job* res = NULL;
+    struct timezone tzp({0,0});
+    auto double_of_tv = [] (struct timeval tv) {
+      return ((double) tv.tv_sec) + ((double) tv.tv_usec)/1000000.;
+    };
+    
     if (finished()) return NULL;
     Job* job = try_pop();
     if (job) return job;
     size_t id = worker_id();
     while (1) {
+      timeval now;
+      auto s = gettimeofday(&now, &tzp);
       // By coupon collector's problem, this should touch all.
       for (int i=0; i <= num_deques * 100; i++) {
-	if (finished()) return NULL;
+	if (finished()) {
+	  time_in_get_job[thread_id].e += gettimeofday(&now, &tzp)-s;
+	  return NULL;
+	}
 	job = try_steal(id);
-	if (job) return job;
+	if (job) {
+	  time_in_get_job[thread_id].e += gettimeofday(&now, &tzp)-s;
+	  return job;
+	}
       }
+      time_in_get_job[thread_id].e += gettimeofday(&now, &tzp)-s;
       // If haven't found anything, take a breather.
       std::this_thread::sleep_for(std::chrono::nanoseconds(num_deques*100));
     }
