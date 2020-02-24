@@ -5,6 +5,11 @@
 #include <cstdint>
 #include <iostream>
 #include <functional>
+#include <array>
+#include <mutex>
+#include <semaphore.h>
+#include <atomic>
+
 
 // EXAMPLE USE 1:
 //
@@ -94,9 +99,9 @@ struct Deque {
       new_age.unit = old_age.unit;
       new_age.pair.top = new_age.pair.top + 1;
       if (cas(&(age.unit), old_age.unit, new_age.unit))  // cas
-	result = job;
+	      result = job;
       else
-	result = NULL;
+	      result = NULL;
     }
     return result;
   }
@@ -295,8 +300,325 @@ private:
   }
 };
 
+class ConcurrentRandomSet {
+  int num_threads;
+  struct alignas(64) flag { bool val; };
+
+  flag* flags; // One flag for each potential element
+
+public:
+  ConcurrentRandomSet() : flags(nullptr) {}
+
+  ConcurrentRandomSet(int num_threads, bool init=true)
+    : num_threads(num_threads) ,
+      flags(nullptr) 
+      {
+        flags = new flag[num_threads];
+        for (int i = 0; i < num_threads; ++i) {
+          flags[i].val = init;
+        }
+      }
+
+  void add(int i) {
+    this->flags[i].val = true;
+  }
+
+  void remove(int i) {
+    this->flags[i].val = false;
+  }
+
+  bool exists(int i) {
+    return this->flags[i].val;
+  }
+
+  // int sample() {
+  //   assert(false); // Unimplemented
+  // }
+
+  ~ConcurrentRandomSet() {
+    delete[] this->flags;
+  }
+};
+
+template <typename Job>
+struct elasticws_scheduler {
+
+public:
+  // see comments under wait(..)
+  static bool const conservative = false;
+  int num_threads;
+  ConcurrentRandomSet crs;
+
+  static thread_local int thread_id;
+
+  elasticws_scheduler() {
+    init_num_workers();
+    crs = ConcurrentRandomSet(this->num_threads); // Initialize CRS
+    num_deques = 2 * num_threads;
+    deques = new Deque<Job>[num_deques];
+    // attempts = new attempt[num_deques];
+    data = new procData[num_threads];
+    finished_flag = 0;
+
+    /* Initialize all the data fields: */
+    for (int i = 0; i < num_threads; ++i) {
+      data[i].seed = hash(i) + 1;
+      data[i].status.clear(data[i].seed, i);
+      sem_init(&data[i].sem, 0, 0);
+    }
+
+    // Spawn num_workers many threads on startup
+    spawned_threads = new std::thread[ num_threads - 1];
+    std::function<bool()> finished = [&] () {  return finished_flag == 1; };
+    thread_id = 0; // thread-local write
+    for (int i=1; i<num_threads; i++) {
+      spawned_threads[i-1] = std::thread([&, i, finished] () {
+        thread_id = i; // thread-local write
+        start(finished);
+      });
+    }
+  }
+
+  ~elasticws_scheduler() {
+    finished_flag = 1;
+    for (int i=1; i<num_threads; i++) {
+      spawned_threads[i-1].join();
+    }
+    delete[] spawned_threads;
+    delete[] deques;
+    for (int i = 0; i < num_threads; ++i) {
+      sem_destroy(&data[i].sem);
+    }
+    delete[] data;
+  }
+
+  // Push onto local stack.
+  void spawn(Job* job) {
+    int id = worker_id();
+    deques[id].push_bottom(job);
+  }
+
+  // Wait for condition: finished().
+  template <typename F>
+  void wait(F finished, bool conservative=false) {
+    // Conservative avoids deadlock if scheduler is used in conjunction
+    // with user locks enclosing a wait.
+    if (conservative)
+      while (!finished())
+    	std::this_thread::yield();
+    // If not conservative, schedule within the wait.
+    // Can deadlock if a stolen job uses same lock as encloses the wait.
+    else start(finished);
+  }
+
+  // All scheduler threads quit after this is called.
+  void finish() {finished_flag = 1;}
+
+  // Pop from local stack.
+  Job* try_pop() {
+    int id = worker_id();
+    return deques[id].pop_bottom();
+  }
+
+  void init_num_workers() {
+    if (const char* env_p = std::getenv("NUM_THREADS")) {
+      num_threads = std::stoi(env_p);
+    } else {
+      num_threads = std::thread::hardware_concurrency();
+    }
+  }
+
+  int num_workers() {
+    return num_threads;
+  }
+  int worker_id() {
+    return thread_id;
+  }
+
+  void set_num_workers(int n) {
+    std::cout << "Unsupported" << std::endl; exit(-1);
+  }
+
+private:
+
+  int num_deques;
+  Deque<Job>* deques;
+  std::thread* spawned_threads;
+  int finished_flag;
+
+  // Data structure for each processor:
+
+  // Status word. 64-bits wide
+  union status_word {
+    uint64_t asUint64; // The order of fields is significant 
+                       // Always initializes the first member
+    struct {
+      uint8_t  busybit  : 1 ;
+      uint64_t priority : 56;
+      uint8_t  head     : 7 ;  // Supports at most 128 processors
+    } bits; 
+  };
+
+  // A status word that can be operated on atomically
+  // 1) clear() will always success in bounded number of steps.
+  // 2) setBusyBit() uses atomic fetch_and_AND. It is guaranteed to
+  //    succeed in bounded number of steps.
+  // 3) updateHead() may fail. It's upto the caller to verify that the
+  //    operations succeeded. This is to ensure that the operation completes
+  //    in bounded number of steps.
+  class AtomicStatusWord {
+    std::atomic<uint64_t> statusWord;
+
+  public:
+    // Since no processor can be a child of itself, the thread_id of the 
+    // processor itself can be used as the nullary value of the head
+
+    AtomicStatusWord() : statusWord(UINT64_C(0)) {}
+
+    AtomicStatusWord(uint64_t prio, uint8_t nullaryHead) {
+      clear(prio, nullaryHead);
+    }
+
+    // 1) Unsets the busy bit
+    // 2) Hashes and obtain a new priority
+    // 3) Resets the head value
+    void clear(uint64_t prio, uint8_t nullaryHead) {
+      status_word word = {UINT64_C(0)};
+      word.bits.busybit  = 0u;   // Not busy
+      word.bits.priority = prio; 
+      word.bits.head     = nullaryHead;
+      statusWord.store(word.asUint64);
+    }
+
+    // Sets busy bit and returns the old status word
+    status_word setBusyBit() {
+      status_word word = {UINT64_C(0)};
+      word.bits.busybit = 1u; // I'm going to be busy
+      word = {statusWord.fetch_or(word.asUint64)};
+      return word;
+    }
+
+    // Update the head field while preserving all other fields
+    bool casHead(status_word word, uint8_t newHead) {
+      uint64_t expected = word.asUint64;
+      word.bits.head = newHead; // Update only the head field
+      return statusWord.compare_exchange_weak(expected, word.asUint64);
+    }
+
+    status_word load() {
+      return status_word{statusWord.load()};
+    }
+  };
+
+  // Align to avoid false sharing
+  // Contains all private fields. Fields are arranged in a compact way.
+  // Designed for best cache behavior.
+  struct alignas(128) procData { 
+    uint64_t         seed;        // Seed for RNG
+    AtomicStatusWord status;      // Status word
+    sem_t            sem;         // Semaphore for sleep/wake-up
+    unsigned char    children[0]; // All remaining bytes are used as linked list for children 
+  };
+
+  procData* data;
+
+  // Start an individual scheduler task.  Runs until finished().
+  template <typename F>
+  void start(F finished) {
+    while (1) {
+      Job* job = get_job(finished);
+      if (!job) return;
+      (*job)();
+    }
+  }
+
+  // Returns 
+  // 1) Id of the target
+  // 2) The job. NULL if none.
+  std::tuple<size_t, Job*> try_steal(size_t id) {
+    // use hashing to get "random" target
+    size_t target = (hash(id) + hash(&data[id].seed)) % num_deques;
+    bool is_empty;
+    Job* job = deques[target].pop_top();
+    return std::make_tuple(target, job);
+  }
+
+  // Find a job, first trying local stack, then random steals.
+  template <typename F>
+  Job* get_job(F finished) {
+    Job* res = NULL;
+    // struct timezone tzp({0,0});
+    // auto double_of_tv = [] (struct timeval tv) {
+    //   return ((double) tv.tv_sec) + ((double) tv.tv_usec)/1000000.;
+    // };
+    
+    if (finished()) return NULL;
+    Job* job = try_pop();
+    if (job) return job;
+    size_t id = worker_id();
+    /* Transition into stealing: */
+    // Clear the status word with new priority and my own id
+    data[id].status.clear(hash(&data[id].seed), id);
+    while (1) {
+      // By coupon collector's problem, this should touch all.
+      if (finished()) return NULL;
+      size_t target;
+      std::tie(target, job) = try_steal(id);
+      // Cannot attach a lifeline to myself. Stealing from myself will not succeed
+      if (target == id) continue;
+      if (job) {
+        // steal is successful, we need to wake up all of our children
+        // Set the busy bit and get all children
+        auto status = data[id].status.setBusyBit();
+        size_t idx = status.bits.head;
+        while (idx != id) {
+          sem_post(&data[idx].sem); // Wake it up.
+          idx = data[id].children[idx];
+        }
+        return job;
+      } else {
+        // It is possible that we are in this branch because the steal failed
+        // due to contention instead of empty queue. However we are still safe 
+        // because of the busy bit.
+        auto target_status = data[target].status.load();
+        auto my_status     = data[id].status.load();
+        if ((!target_status.bits.busybit) && 
+            target_status.bits.priority > my_status.bits.priority) {
+          data[target].children[id] = target_status.bits.head;
+          // It's safe to just leave it in the array even if the following
+          // CAS fails because it will never be referenced in case of failure.
+          if (data[target].status.casHead(target_status, id)) {
+            sem_wait(&data[id].sem);
+          } else {
+            continue; // We give up
+          }
+        }
+        continue; // If it fails, then nothing happens
+      }
+      //std::this_thread::sleep_for(std::chrono::nanoseconds(num_deques*100));
+    }
+  }
+
+  static inline uint64_t hash(uint64_t x) {
+    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+    x = x ^ (x >> 31);
+    return x;
+  }
+
+  static inline uint64_t hash(uint64_t *seed) {
+    uint64_t x = hash(*seed);
+    *seed = x;
+    return x;
+  }
+
+};
+
 template<typename T>
 thread_local int scheduler<T>::thread_id = 0;
+
+template<typename T>
+thread_local int elasticws_scheduler<T>::thread_id = 0;
 
 struct fork_join_scheduler {
 
@@ -305,10 +627,10 @@ public:
   // and return nothing.   Could be a lambda, e.g. [] () {}.
   using Job = std::function<void()>;
 
-  scheduler<Job>* sched;
+  elasticws_scheduler<Job>* sched;
 
   fork_join_scheduler() {
-    sched = new scheduler<Job>;
+    sched = new elasticws_scheduler<Job>;
   }
 
   ~fork_join_scheduler() {

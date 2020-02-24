@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <type_traits>
 #include <type_traits>
-#include <math.h>
+#include <cmath>
 #include <atomic>
 #include <cstring>
 #include "parallel.h"
