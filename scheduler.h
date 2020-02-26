@@ -7,9 +7,9 @@
 #include <functional>
 #include <array>
 #include <mutex>
+#include <functional> 
 #include <semaphore.h>
 #include <atomic>
-
 
 // EXAMPLE USE 1:
 //
@@ -157,9 +157,9 @@ public:
 
   scheduler() {
     init_num_workers();
-    num_deques = 2*num_threads;
-    deques = new Deque<Job>[num_deques];
-    attempts = new attempt[num_deques];
+    num_deques = 2 * num_threads;
+    deques     = new Deque<Job>[num_deques];
+    attempts   = new attempt[num_deques];
     finished_flag = 0;
 
     // Spawn num_workers many threads on startup
@@ -304,13 +304,22 @@ class ConcurrentRandomSet {
   int num_threads;
   struct alignas(64) flag { bool val; };
 
+  // Take in the worker id roll's its dice
+  typedef std::function<uint64_t(size_t)> RngFunc;
+  RngFunc rng;
+
   flag* flags; // One flag for each potential element
 
 public:
-  ConcurrentRandomSet() : flags(nullptr) {}
+  ConcurrentRandomSet() 
+    : num_threads(0),
+      flags(nullptr),
+      rng([](size_t i){return UINT64_C(0);})
+    {}
 
-  ConcurrentRandomSet(int num_threads, bool init=true)
-    : num_threads(num_threads) ,
+  ConcurrentRandomSet(int num_threads, RngFunc rng, bool init=true)
+    : num_threads(num_threads), 
+      rng(rng), 
       flags(nullptr) 
       {
         flags = new flag[num_threads];
@@ -319,21 +328,25 @@ public:
         }
       }
 
-  void add(int i) {
+  void add(uint64_t i) {
     this->flags[i].val = true;
   }
 
-  void remove(int i) {
+  void remove(uint64_t i) {
     this->flags[i].val = false;
   }
 
-  bool exists(int i) {
+  bool exists(uint64_t i) {
     return this->flags[i].val;
   }
 
-  // int sample() {
-  //   assert(false); // Unimplemented
-  // }
+  uint64_t sample(size_t id) {
+    uint64_t rand;
+    do {
+      rand = rng(id) % num_threads;
+    } while (!this->flags[rand].val);
+    return rand;
+  }
 
   ~ConcurrentRandomSet() {
     delete[] this->flags;
@@ -342,7 +355,6 @@ public:
 
 template <typename Job>
 struct elasticws_scheduler {
-
 public:
   // see comments under wait(..)
   static bool const conservative = false;
@@ -353,7 +365,6 @@ public:
 
   elasticws_scheduler() {
     init_num_workers();
-    crs = ConcurrentRandomSet(this->num_threads); // Initialize CRS
     num_deques = 2 * num_threads;
     deques = new Deque<Job>[num_deques];
     // attempts = new attempt[num_deques];
@@ -366,6 +377,12 @@ public:
       data[i].status.clear(data[i].seed, i);
       sem_init(&data[i].sem, 0, 0);
     }
+
+    // Initialize CRS
+    auto rng = [data = this->data](size_t i) {
+      return hash(&data[i].seed);
+    };
+    crs = ConcurrentRandomSet(this->num_threads, rng); // Initialize CRS
 
     // Spawn num_workers many threads on startup
     spawned_threads = new std::thread[ num_threads - 1];
@@ -588,7 +605,9 @@ private:
           // It's safe to just leave it in the array even if the following
           // CAS fails because it will never be referenced in case of failure.
           if (data[target].status.casHead(target_status, id)) {
+            crs.add(id);
             sem_wait(&data[id].sem);
+            crs.remove(id);
           } else {
             continue; // We give up
           }
