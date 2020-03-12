@@ -177,6 +177,77 @@ inline void parallel_run(Job job, int) {
   job();
 }
 
+#elif defined(MCSL)
+#include "mcsl_fjnative.hpp"
+
+
+inline int num_workers() { return 1;}
+inline int worker_id() { return (int)mcsl::perworker::unique_id::get_my_id();}
+inline void set_num_workers(int n) { ; }
+#define PAR_GRANULARITY 1000
+
+bool started = false;
+
+template <typename Lf, typename Rf>
+inline void par_do(Lf left, Rf right, bool conservative) {
+  if (! started) {
+    left(); right();
+    return;
+  }
+  mcsl::fork2(left, right);
+}
+
+template <typename F>
+int get_granularity(size_t start, size_t end, F f) {
+  size_t done = 0;
+  size_t size = 1;
+  int ticks;
+  do {
+    size = std::min(size,end-(start+done));
+    auto tstart = std::chrono::high_resolution_clock::now();
+    for (size_t i=0; i < size; i++) f(start+done+i);
+    auto tstop = std::chrono::high_resolution_clock::now();
+    ticks = (tstop-tstart).count();
+    done += size;
+    size *= 2;
+  } while (ticks < 1000 && done < (end-start));
+  return done;
+}
+
+template <typename F>
+void parfor_(size_t start, size_t end, F f,
+             size_t granularity,
+             bool conservative) {
+  if ((end - start) <= granularity)
+    for (size_t i=start; i < end; i++) f(i);
+  else {
+    size_t n = end-start;
+    // Not in middle to avoid clashes on set-associative caches
+    // on powers of 2.
+    size_t mid = (start + (9*(n+1))/16);
+    par_do([&] () {parfor_(start, mid, f, granularity, conservative);},
+          [&] () {parfor_(mid, end, f, granularity, conservative);},
+          conservative);
+  }
+}
+
+template <class F>
+inline void parallel_for(long start, long end, F f,
+			 long granularity,
+			 bool conservative) {
+  if (end <= start) return;
+  if (granularity == 0) {
+    long done = get_granularity(start,end, f);
+    granularity = std::max(done, (end-start)/(128*num_workers()));
+    parfor_(start+done, end, f, granularity, conservative);
+  } else parfor_(start, end, f, granularity, conservative);
+}
+
+template <typename Job>
+inline void parallel_run(Job job, int num_threads=0) {
+  job();
+}
+
 // c++
 #else
 

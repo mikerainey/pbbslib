@@ -29,6 +29,10 @@ typename Seq::value_type mcss(Seq const &A) {
 }
 
 int main (int argc, char *argv[]) {
+  auto f_body = mcsl::new_fjnative_of_function([&] {
+                                                 started = true;
+
+  
   commandLine P(argc, argv, "[-r <rounds>] [-n <size>]");
   int rounds = P.getOptionIntValue("-r", 3);
   size_t n = 100000000;
@@ -44,4 +48,20 @@ int main (int argc, char *argv[]) {
     t.next("Total");
   }
   cout << result << endl;
+  });
+  auto nb_workers = 1;
+  f_body->release();
+  using scheduler_type = mcsl::chase_lev_work_stealing_scheduler<mcsl::basic_scheduler_configuration, mcsl::fiber, mcsl::basic_stats>;
+  auto start_time = std::chrono::system_clock::now();
+  scheduler_type::launch(nb_workers);
+  auto end_time = std::chrono::system_clock::now();
+  
+  mcsl::basic_stats::on_exit_launch();
+  {
+    std::chrono::duration<double> elapsed = end_time - start_time;
+    printf("exectime %.3f\n", elapsed.count());
+  }
+  mcsl::basic_stats::report();
+  
+  return 0;
 }
