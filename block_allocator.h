@@ -37,6 +37,15 @@
 #include "utilities.h"
 #include "memory_size.h"
 
+template <class F>
+inline void sequential_for(long start, long end, F f,
+			 long granularity=0,
+			 bool conservative=false) {
+  for (long i=start; i<end; i++) {
+    f(i);
+  }
+}
+
 struct block_allocator {
 private:
 
@@ -95,7 +104,7 @@ int block_allocator::thread_count = num_workers();
 // Allocate a new list of list_length elements
 
 auto block_allocator::initialize_list(block_p start) -> block_p {
-  parallel_for (0, list_length - 1, [&] (size_t i) {
+  sequential_for (0, list_length - 1, [&] (size_t i) {
       block_p p =  (block_p) (((char*) start) + i * block_size_);
       p->next = (block_p) (((char*) p) + block_size_);
     }, 1000, true);
@@ -142,7 +151,7 @@ auto block_allocator::get_list() -> block_p {
 void block_allocator::reserve(size_t n) {
   size_t num_lists = thread_count + ceil(n / (double)list_length);
   char* start = allocate_blocks(list_length*num_lists);
-  parallel_for(0, num_lists, [&] (size_t i) {
+  sequential_for(0, num_lists, [&] (size_t i) {
       block_p offset = (block_p) (start + i * list_length * block_size_);
       global_stack.push(initialize_list(offset));
     });

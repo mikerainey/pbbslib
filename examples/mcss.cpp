@@ -28,28 +28,24 @@ typename Seq::value_type mcss(Seq const &A) {
   return get<0>(r);
 }
 
+
 int main (int argc, char *argv[]) {
-  auto f_body = mcsl::new_fjnative_of_function([&] {
-                                                 started = true;
-
-  
-  commandLine P(argc, argv, "[-r <rounds>] [-n <size>]");
-  int rounds = P.getOptionIntValue("-r", 3);
-  size_t n = 100000000;
-  n = P.getOptionLongValue("-n", 1);
-  timer t("MCSS");
-  using T = double;
-
-  pbbs::random r(0);
-  sequence<T> A(n, [&] (size_t i) {return (T) (r[i]%n - n/2);});
-  T result;
-  for (int i=0; i < rounds; i++) {
-    result = mcss(A);
-    t.next("Total");
-  }
-  cout << result << endl;
+  auto f_body = mcsl::new_fjnative_of_function([&] { 
+    commandLine P(argc, argv, "[-r <rounds>] [-n <size>]");
+    int rounds = P.getOptionIntValue("-r", 2);
+    long n = P.getOptionLongValue("-n", 1);
+    timer t("MCSS");
+    using T = double; 
+    pbbs::random r(0);
+    sequence<T> A(n, [&] (size_t i) {return (T) (r[i]%n - n/2);});
+    T result;
+    for (int i=0; i < rounds; i++) {
+      result = mcss(A);
+      t.next("Total");
+    }
+    cout << result << endl;
   });
-  auto nb_workers = 1;
+  auto nb_workers = 4;
   f_body->release();
   using scheduler_type = mcsl::chase_lev_work_stealing_scheduler<mcsl::basic_scheduler_configuration, mcsl::fiber, mcsl::basic_stats>;
   auto start_time = std::chrono::system_clock::now();

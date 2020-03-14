@@ -6,7 +6,7 @@ JEMALLOC = -L$(JEMALLOCLD) -ljemalloc
 endif
 
 CONCEPTS = -fconcepts -DCONCEPTS
-CFLAGS = ../../mcsl-v2/example/native.S -I ../ -I ../../mcsl-v2/include -O0 -g3 -mcx16 -std=c++17 -march=native  -DUSEMALLOC # -Wall
+CFLAGS = ../../mcsl-v2/example/native.o -I ../ -I ../../mcsl-v2/include -O0 -g3 -mcx16 -std=c++17 -march=native -m64 --save-temps # -Wall -I ../
 
 OMPFLAGS = -DOPENMP -fopenmp
 CILKFLAGS = -DCILK -fcilkplus

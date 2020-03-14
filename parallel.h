@@ -180,20 +180,13 @@ inline void parallel_run(Job job, int) {
 #elif defined(MCSL)
 #include "mcsl_fjnative.hpp"
 
-
 inline int num_workers() { return 1;}
 inline int worker_id() { return (int)mcsl::perworker::unique_id::get_my_id();}
 inline void set_num_workers(int n) { ; }
 #define PAR_GRANULARITY 1000
 
-bool started = false;
-
 template <typename Lf, typename Rf>
 inline void par_do(Lf left, Rf right, bool conservative) {
-  if (! started) {
-    left(); right();
-    return;
-  }
   mcsl::fork2(left, right);
 }
 
@@ -226,7 +219,7 @@ void parfor_(size_t start, size_t end, F f,
     // on powers of 2.
     size_t mid = (start + (9*(n+1))/16);
     par_do([&] () {parfor_(start, mid, f, granularity, conservative);},
-          [&] () {parfor_(mid, end, f, granularity, conservative);},
+           [&] () {parfor_(mid, end, f, granularity, conservative);},
           conservative);
   }
 }

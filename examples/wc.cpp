@@ -10,7 +10,6 @@ int main (int argc, char *argv[]) {
   mcsl::basic_stats::on_enter_launch();
 
   auto f_body = mcsl::new_fjnative_of_function([&] {
-                                                 started = true;
     commandLine P(argc, argv, "[-r <rounds>] infile");
     int rounds = P.getOptionIntValue("-r", 1);
     char* filename = P.getArgument(0);
