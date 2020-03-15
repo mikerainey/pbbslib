@@ -30,34 +30,26 @@ typename Seq::value_type mcss(Seq const &A) {
 
 
 int main (int argc, char *argv[]) {
-  auto f_body = mcsl::new_fjnative_of_function([&] { 
-    commandLine P(argc, argv, "[-r <rounds>] [-n <size>]");
-    int rounds = P.getOptionIntValue("-r", 2);
-    long n = P.getOptionLongValue("-n", 1);
-    timer t("MCSS");
-    using T = double; 
-    pbbs::random r(0);
-    sequence<T> A(n, [&] (size_t i) {return (T) (r[i]%n - n/2);});
-    T result;
-    for (int i=0; i < rounds; i++) {
-      result = mcss(A);
-      t.next("Total");
-    }
-    cout << result << endl;
-  });
-  auto nb_workers = 4;
-  f_body->release();
-  using scheduler_type = mcsl::chase_lev_work_stealing_scheduler<mcsl::basic_scheduler_configuration, mcsl::fiber, mcsl::basic_stats>;
-  auto start_time = std::chrono::system_clock::now();
-  scheduler_type::launch(nb_workers);
-  auto end_time = std::chrono::system_clock::now();
-  
-  mcsl::basic_stats::on_exit_launch();
-  {
-    std::chrono::duration<double> elapsed = end_time - start_time;
-    printf("exectime %.3f\n", elapsed.count());
-  }
-  mcsl::basic_stats::report();
+  mcsl::launch(argc, (char**)argv,
+             [&] {
+
+             },
+             [&] {
+             }, [&] {
+               commandLine P(argc, argv, "[-r <rounds>] [-n <size>]");
+               int rounds = P.getOptionIntValue("-r", 2);
+               long n = P.getOptionLongValue("-n", 1);
+               timer t("MCSS");
+               using T = double; 
+               pbbs::random r(0);
+               sequence<T> A(n, [&] (size_t i) {return (T) (r[i]%n - n/2);});
+               T result;
+               for (int i=0; i < rounds; i++) {
+                 result = mcss(A);
+                 t.next("Total");
+               }
+               cout << result << endl;
+             });
   
   return 0;
 }
