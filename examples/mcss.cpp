@@ -30,25 +30,25 @@ typename Seq::value_type mcss(Seq const &A) {
 
 
 int main (int argc, char *argv[]) {
+  commandLine P(argc, argv, "[-r <rounds>] [-n <size>]");
+  int rounds = P.getOptionIntValue("-r", 2);
+  long n = P.getOptionLongValue("-n", 1);
+  timer t("MCSS");
+  using T = double;
+  sequence<T> A;
+  T result;
   mcsl::launch(argc, (char**)argv,
              [&] {
-
+               pbbs::random r(0);
+               A = sequence<T>(n, [&] (size_t i) {return (T) (r[i]%n - n/2);});
              },
              [&] {
+               cout << result << endl;
              }, [&] {
-               commandLine P(argc, argv, "[-r <rounds>] [-n <size>]");
-               int rounds = P.getOptionIntValue("-r", 2);
-               long n = P.getOptionLongValue("-n", 1);
-               timer t("MCSS");
-               using T = double; 
-               pbbs::random r(0);
-               sequence<T> A(n, [&] (size_t i) {return (T) (r[i]%n - n/2);});
-               T result;
                for (int i=0; i < rounds; i++) {
                  result = mcss(A);
                  t.next("Total");
                }
-               cout << result << endl;
              });
   
   return 0;
