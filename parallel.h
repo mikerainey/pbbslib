@@ -236,6 +236,19 @@ inline void parallel_for(long start, long end, F f,
   } else parfor_(start, end, f, granularity, conservative);
 }
 
+template <class F>
+inline void mcsl_for(long start, long end, F f,
+                     long granularity=0,
+                     bool conservative=false) {
+  if (mcsl::started) {
+    parallel_for(start, end, f, granularity, conservative);
+    return;
+  }
+  for (long i=start; i<end; i++) {
+    f(i);
+  }
+}
+
 template <typename Job>
 inline void parallel_run(Job job, int num_threads=0) {
   job();
