@@ -28,7 +28,6 @@ typename Seq::value_type mcss(Seq const &A) {
   return get<0>(r);
 }
 
-
 int main (int argc, char *argv[]) {
   commandLine P(argc, argv, "[-r <rounds>] [-n <size>]");
   int rounds = P.getOptionIntValue("-r", 2);
@@ -49,7 +48,6 @@ int main (int argc, char *argv[]) {
                  result = mcss(A);
                  t.next("Total");
                }
-             });
-  
+             });  
   return 0;
 }

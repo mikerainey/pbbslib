@@ -10,7 +10,7 @@ CFLAGS = -I ../ -I ../../mcsl-v2/include -I $(CMDLINE_INCLUDE_PATH) -O0 -g3 -mcx
 
 OMPFLAGS = -DOPENMP -fopenmp
 CILKFLAGS = -DCILK -fcilkplus
-HGFLAGS = -DMCSL -pthread -DMCSL_ENABLE_LOGGING
+HGFLAGS = -DMCSL -pthread -DMCSL_ENABLE_STATS -DMCSL_ENABLE_LOGGING
 
 ifdef CLANG
 CC = clang++

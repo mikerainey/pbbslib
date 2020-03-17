@@ -5,21 +5,30 @@
 using namespace pbbs;
 
 int main (int argc, char *argv[]) {
-  commandLine P(argc, argv, "[-r <rounds>] search_string infile");
-  int rounds = P.getOptionIntValue("-r", 1);
-  auto search_str = to_sequence(std::string(P.getArgument(1)));
-  char* filename = P.getArgument(0);
-
+  std::string infile, pattern;
+  //  commandLine P(argc, argv, "[-r <rounds>] search_string infile");
+  //int rounds = P.getOptionIntValue("-r", 1);
+  int rounds = 1;
   timer t("grep", true);
-  
-  range<char*> str = char_range_from_file(filename);
-  t.next("read file");
-  sequence<char> out_str;
-
-  for (int i=0; i < rounds; i++) {
-    out_str = grep(str, search_str);
-    t.next("do work");
-  }
-  cout << out_str;
+  sequence<char> out_str, search_str;
+  range<char*> str;
+  mcsl::launch(argc, (char**)argv,
+               [&] {
+                 infile = deepsea::cmdline::parse_or_default_string("infile", "grep.txt");
+                  pattern = deepsea::cmdline::parse_or_default_string("pattern", "xxy");
+                 char* filename = (char*)infile.c_str();
+                 search_str = to_sequence(std::string((char*)pattern.c_str()));
+                 str = char_range_from_file(filename);
+                 t.next("read file");
+               },
+               [&] {
+                 //cout << out_str;
+               }, [&] {
+                 for (int i=0; i < rounds; i++) {
+                   out_str = grep(str, search_str);
+                   t.next("do work");
+                 }
+               });
+  return 0;
 }
 
