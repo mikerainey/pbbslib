@@ -57,7 +57,7 @@ stdenv.mkDerivation rec {
 
     mkdir -p $examples/
     (cd examples
-     cp mcss wc grep build_index primes longest_repeated_substring bw \
+     cp build_index primes longest_repeated_substring bw \
        $examples)
 
     '';

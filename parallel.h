@@ -70,6 +70,13 @@ inline void parallel_for(long start, long end, F f,
   }
 }
 
+template <class F>
+inline void mcsl_for(long start, long end, F f,
+                     long granularity=0,
+                     bool conservative=false) {
+  parallel_for(start, end, f, granularity, conservative);
+}
+
 template <typename Lf, typename Rf>
 inline void par_do(Lf left, Rf right, bool conservative) {
     cilk_spawn right();
@@ -165,6 +172,13 @@ inline void parallel_for(long start, long end, F f,
 			 bool conservative) {
   if (end > start)
     fj.parfor(start, end, f, granularity, conservative);
+}
+
+template <class F>
+inline void mcsl_for(long start, long end, F f,
+                     long granularity=0,
+                     bool conservative=false) {
+  parallel_for(start, end, f, granularity, conservative);
 }
 
 template <typename Lf, typename Rf>
@@ -269,6 +283,13 @@ inline void parallel_for(long start, long end, F f,
   for (long i=start; i<end; i++) {
     f(i);
   }
+}
+
+template <class F>
+inline void mcsl_for(long start, long end, F f,
+                     long granularity=0,
+                     bool conservative=false) {
+  parallel_for(start, end, f, granularity, conservative);
 }
 
 template <typename Lf, typename Rf>
