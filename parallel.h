@@ -194,10 +194,10 @@ inline void parallel_run(Job job, int) {
 #elif defined(MCSL)
 #include "mcsl_fjnative.hpp"
 
-inline int num_workers() { return 128;} // for now, use conservative value, because it's needed statically by block_allocator
+inline int num_workers() { return 72;} // for now, use conservative value, because it's needed statically by block_allocator
 inline int worker_id() { return (int)mcsl::perworker::unique_id::get_my_id();}
 inline void set_num_workers(int n) { ; }
-#define PAR_GRANULARITY 1000
+#define PAR_GRANULARITY 2000
 
 template <typename Lf, typename Rf>
 inline void par_do(Lf left, Rf right, bool conservative) {
